@@ -1,0 +1,13 @@
+[project]
+name = "orf"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pygame>=2.6.1",
+    "pyinstaller>=6.21.0",
+    "selenium>=4.45.0",
+    "undetected-chromedriver>=3.5.5",
+    "webdriver-manager>=4.1.2",
+]
