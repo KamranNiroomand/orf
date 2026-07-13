@@ -108,3 +108,5 @@ dmypy.json
 Thumbs.db
 results_log/*
 table.csv
+# Claude Code local settings
+.claude/

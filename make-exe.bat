@@ -1,1 +1,1 @@
-pyinstaller --onefile --noconsole --add-data "chromedriver-win64/chromedriver.exe;." --add-data "slides;slides" main.py
+pyinstaller --onefile --noconsole  --add-data "slides;slides" main.py
