@@ -1,0 +1,4 @@
+google-cloud-storage==2.18.0
+pyautogui==0.9.54
+pywinrm==0.4.3
+pynput==1.7.7
