@@ -1,4 +1,5 @@
 import ctypes
+import re
 import subprocess
 import time
 import datetime
@@ -10,8 +11,8 @@ import pygetwindow as gw
 # ================= CONFIG =================
 RDP_ADDRESS = "192.168.1.2"
 RDP_PORT = 3389  # change if the remote listens on a non-default RDP port
-USERNAME = "pc2"
-PASSWORD = "123"
+USERNAME = "pc1"
+PASSWORD = "123456"
 
 WAIT_AFTER_LOGIN = 15
 
@@ -136,8 +137,8 @@ def send_text():
     pyautogui.press("space")
     time.sleep(1)
 
-    #print("Sending text...")
-    #pyautogui.write(text, interval=0.02)
+    # print("Sending text...")
+    # pyautogui.write(text, interval=0.02)
 
     print("Done.")
 
@@ -147,12 +148,147 @@ def close_rdp():
     subprocess.run(["cmdkey", f"/delete:TERMSRV/{RDP_TARGET}"], capture_output=True)
 
 
+def print_ping_latency():
+    """
+    Ping RDP_ADDRESS and report the network delay in plain language,
+    for a non-technical operator calibrating the remote device's timing.
+    """
+    print("Measuring network delay between this computer and the remote device...")
+    result = subprocess.run(
+        ["ping", "-n", "4", RDP_ADDRESS],
+        capture_output=True,
+        text=True,
+    )
+
+    times_ms = [int(m) for m in re.findall(r"time[=<](\d+)ms", result.stdout)]
+
+    if not times_ms:
+        print(
+            "Could not measure network delay (device did not respond). "
+            "For accurate calibration, first make sure the device is connected to the network."
+        )
+        return
+
+    avg_rtt = sum(times_ms) / len(times_ms)
+    one_way = avg_rtt / 2
+
+    print(f"Round-trip network delay: about {avg_rtt:.0f} ms")
+    print(f"One-way delay (estimated): about {one_way:.0f} ms")
+    print(
+        "Note: this number is only the network delay, not the clock difference "
+        "between the two devices. If your calibration needs higher accuracy than this, "
+        "the remote device's clock must be checked separately against an accurate time "
+        "source (NTP)."
+    )
+
+
+def print_clock_skew():
+    """
+    Read the remote machine's exact clock via PowerShell Remoting (WinRM)
+    and compare it to our own, printing the difference in seconds.
+
+    Requires WinRM to be enabled on the remote machine first
+    (see WINRM_SETUP.md).
+    """
+    print("Checking remote clock via WinRM...")
+
+    ps_command = (
+        f"$s = New-PSSession -ComputerName {RDP_ADDRESS} -Credential "
+        f"(New-Object System.Management.Automation.PSCredential('{USERNAME}', "
+        f"(ConvertTo-SecureString '{PASSWORD}' -AsPlainText -Force))); "
+        f"Invoke-Command -Session $s {{ Get-Date -Format o }}; "
+        f"Remove-PSSession $s"
+    )
+
+    before = datetime.datetime.now()
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", ps_command],
+        capture_output=True,
+        text=True,
+    )
+    after = datetime.datetime.now()
+
+    output = result.stdout.strip()
+    if not output:
+        print("Could not read the remote clock. Is WinRM enabled? See WINRM_SETUP.md.")
+        if result.stderr.strip():
+            print(result.stderr.strip())
+        return
+
+    try:
+        remote_time = datetime.datetime.fromisoformat(output.splitlines()[-1])
+    except ValueError:
+        print("Unexpected response from remote machine:", output)
+        return
+
+    rtt_seconds = (after - before).total_seconds()
+    local_midpoint = before + (after - before) / 2
+    skew_seconds = (remote_time.replace(tzinfo=None) - local_midpoint).total_seconds()
+
+    print(f"Remote clock is {skew_seconds:+.2f} seconds relative to this computer.")
+    print(
+        f"(Positive = remote clock is ahead. Margin of error: "
+        f"±{rtt_seconds / 2 * 1000:.0f} ms, based on a measured round-trip of "
+        f"{rtt_seconds * 1000:.0f} ms for this request.)"
+    )
+
+
+def print_clock_skew_ssh():
+    """
+    Read the remote machine's exact clock via SSH (OpenSSH Server on Windows)
+    and compare it to our own, printing the difference in seconds.
+
+    Requires an SSH server enabled on the remote machine and this machine's
+    SSH key (or password) to be accepted.
+    """
+    print("Checking remote clock via SSH...")
+
+    before = datetime.datetime.now()
+    result = subprocess.run(
+        [
+            "ssh",
+            f"{USERNAME}@{RDP_ADDRESS}",
+            "powershell", "-NoProfile", "-Command", "Get-Date -Format o",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    after = datetime.datetime.now()
+
+    output = result.stdout.strip()
+    if not output:
+        print("Could not read the remote clock over SSH. Is the SSH server enabled?")
+        if result.stderr.strip():
+            print(result.stderr.strip())
+        return
+
+    try:
+        remote_time = datetime.datetime.fromisoformat(output.splitlines()[-1])
+    except ValueError:
+        print("Unexpected response from remote machine:", output)
+        return
+
+    rtt_seconds = (after - before).total_seconds()
+    local_midpoint = before + (after - before) / 2
+    skew_seconds = (remote_time.replace(tzinfo=None) - local_midpoint).total_seconds()
+
+    print(f"Remote clock is {skew_seconds:+.2f} seconds relative to this computer.")
+    print(
+        f"(Positive = remote clock is ahead. Margin of error: "
+        f"±{rtt_seconds / 2 * 1000:.0f} ms, based on a measured round-trip of "
+        f"{rtt_seconds * 1000:.0f} ms for this request.)"
+    )
+
+
 def main():
     open_rdp()
     send_text()
 
     input("Press ENTER to close RDP...")
     close_rdp()
+    # print_clock_skew()  # uncomment once WinRM is enabled on the remote machine (see WINRM_SETUP.md)
+    # print_clock_skew_ssh()  # uncomment once SSH server is enabled on the remote machine
 
 
 if __name__ == "__main__":
