@@ -9,10 +9,11 @@ from typing import Dict, Any, List, Optional
 
 import undetected_chromedriver as uc
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+
+from nback import run_nback_level
 
 
 # ====================== PATH HANDLING FOR EXE AND SCRIPT ======================
@@ -25,8 +26,9 @@ else:
 
 # ========================= CONFIGURATION =========================
 IMAGE_FOLDER: str = os.path.join(base_path, "slides")
-START_NBACK_LEVEL: int = 2
-GAME_DURATION: int = 5 * 60  # 5 minutes in seconds
+NBACK_LEVELS: List[int] = [2, 3]        # levels to cycle through, in order
+NBACK_LEVEL_DURATION: int = 60          # seconds per level (see nback.py for trial timing)
+DEBUG: bool = True                      # show live trial/stats overlay during the N-Back task
 LOG_FOLDER: str = "results_log"
 
 os.makedirs(LOG_FOLDER, exist_ok=True)
@@ -59,11 +61,12 @@ def setup_selenium() -> uc.Chrome:
     options.add_argument("--kiosk")  # Fullscreen (F11 equivalent)
 
     try:
-        driver_path = ChromeDriverManager().install()
-        driver = uc.Chrome(service=ChromeService(driver_path), 
-                          options=options, 
+        # driver_path = ChromeDriverManager().install()
+        driver_path = str(Path(__file__).parent / "chromedriver-win64" / "chromedriver.exe")
+        driver = uc.Chrome(driver_executable_path=driver_path,
+                          options=options,
                           use_subprocess=True)
-    except:
+    except Exception as e:
         driver = uc.Chrome(options=options, use_subprocess=True)
 
     # Hide automation flags
@@ -230,7 +233,7 @@ def main() -> None:
     start_new_session()  # Initialize logging for this run
 
     current_index = 0
-    nback_level = START_NBACK_LEVEL
+    level_index = 0
     running = True
 
     while running:
@@ -250,41 +253,16 @@ def main() -> None:
 
             elif event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_RIGHT):
-                    
-                    # Minimize Pygame window
-                    pygame.display.iconify()
-                    time.sleep(1)
 
-                    # Setup and open browser
-                    driver = setup_selenium()
-                    success = open_website_with_retry(driver, "https://cognitivetrain.com/n-back-test/")
-
-                    if not success:
-                        print("Could not open website. Skipping to next slide.")
-                        driver.quit()
-                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-                        current_index = (current_index + 1) % len(images)
-                        continue
-
-                    time.sleep(4)
-
-                    # uncomment here if you want to set the difficulty level automatically
-                    # set_nback_level(driver, nback_level)
-                    start_test(driver)
+                    nback_level = NBACK_LEVELS[level_index % len(NBACK_LEVELS)]
 
                     print(f"Starting {nback_level}-Back test...")
-                    time.sleep(GAME_DURATION)
-
-                    # Extract and save results
-                    results = extract_results(driver)
+                    results = run_nback_level(screen, nback_level, NBACK_LEVEL_DURATION, DEBUG)
                     save_task_result(nback_level, results)
 
-                    driver.quit()
-                    
-                    # Next level
-                    nback_level += 1
-                    
-                    # Restore fullscreen
+                    level_index += 1
+
+                    # Restore slideshow display mode
                     screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                     time.sleep(0.5)
 
