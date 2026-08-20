@@ -2,6 +2,12 @@
 
 This guide explains how to configure and run this program.
 
+> **Running the interface on a Mac, with ThoughtTech on a second laptop?**
+> See [HELP_MAC_TWO_LAPTOPS.md](HELP_MAC_TWO_LAPTOPS.md) — it covers installing
+> the interface on macOS, why a USB cable between two laptops doesn't forward
+> keystrokes, and how to get Space presses to create markers. Note the guide
+> below (`main.py`) is **Windows-only**.
+
 ## 1. Configure the settings
 
 Open [main.py](main.py) and edit the values in the `CONFIG` section near the top of the file:

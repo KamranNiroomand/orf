@@ -8,6 +8,15 @@ in the same fullscreen window, then saves the results to a per-session JSON log.
 The task no longer depends on any external website — it's implemented locally
 in [nback.py](nback.py) with pygame.
 
+## Using this with ThoughtTech on a second laptop
+
+If you run this interface on one computer (e.g. a Mac) and **ThoughtTech** on
+another, and you want your Space presses to create markers on the signal, see
+[remote-desktop-test/HELP_MAC_TWO_LAPTOPS.md](remote-desktop-test/HELP_MAC_TWO_LAPTOPS.md). Short version: a USB cable
+between two laptops does **not** forward keystrokes, and ThoughtTech must be
+the frontmost window on its own machine to register a Space press.
+That guide also covers installing and running this interface on macOS.
+
 ## Requirements
 
 - **Python 3.12+**
